@@ -1,0 +1,46 @@
+name: Automated Reconnaissance
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Enter the domain/IP/CIDR for scanning'
+        required: true
+        default: 'example.com'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Cache Docker layers
+      uses: actions/cache@v2
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push Docker image
+      run: |
+        docker buildx build --push --tag ${{ secrets.DOCKER_USERNAME }}/rengine:latest .
+
+    - name: Run reNgine
+      run: |
+        docker-compose up -d
+
+    - name: Run reconnaissance
+      run: |
+        docker exec -it rengine_container_name python3 manage.py scan --target ${{ github.event.inputs.target }}
